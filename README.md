@@ -63,13 +63,17 @@ Traditional RAG systems chunk documents and embed them directly. This loses cont
 │         • Standard embedding (chunk only)                        │
 │         • Contextual embedding (context + chunk)                │
 │                                                                  │
+│  5. Vector Store (Qdrant) ⭐ NEW!                                │
+│     └─> Store chunks with dual named vectors                    │
+│     └─> Similarity search on contextual embeddings              │
+│     └─> Collection management with auto-creation                │
+│                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────┐
 │                    TODO (Phase 2)                                │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  5. Vector Store (Qdrant)                                        │
 │  6. BM25 Index (Lexical Search)                                  │
 │  7. Hybrid Retrieval (Vector + BM25)                             │
 │  8. Reranking                                                    │
@@ -108,7 +112,15 @@ INPUT: document.pdf
              │ [{chunk_text, context,
              │   embedding, contextual_embedding}, ...]
              ▼
+    ┌────────────────┐
+    │  Vector Store  │◄─── Qdrant Database
+    └────────┬───────┘
+             │ Stored with dual vectors:
+             │ • embedding (standard)
+             │ • contextual_embedding (enhanced)
+             ▼
          OUTPUT
+         Ready for search!
 ```
 
 ## 📁 Project Structure
@@ -126,7 +138,7 @@ docagentContextual/
 │   ├── chunker.py            # ✅ Token-based chunking
 │   ├── contextualizer.py     # ✅ Claude API integration
 │   ├── embedder.py           # ✅ Vector embeddings
-│   ├── vector_store.py       # ⏳ TODO: Qdrant integration
+│   ├── vector_store.py       # ✅ Qdrant integration
 │   ├── bm25_index.py         # ⏳ TODO: Lexical search
 │   ├── retriever.py          # ⏳ TODO: Hybrid retrieval
 │   └── reranker.py           # ⏳ TODO: Result reranking
@@ -135,7 +147,8 @@ docagentContextual/
 │   ├── __init__.py
 │   ├── test_chunker.py       # Test chunking logic
 │   ├── test_contextualizer.py# Test Claude API
-│   └── test_embedder.py      # Test embeddings
+│   ├── test_embedder.py      # Test embeddings
+│   └── test_vector_store.py  # Test Qdrant storage
 │
 └── data/                     # Document storage
     └── reference.docx        # Sample document
@@ -177,13 +190,23 @@ EMBEDDING_DIMENSION = 384
 CLAUDE_MODEL = "claude-3-5-haiku-20241022"
 ```
 
-### 3. Run Tests
+### 3. Start Qdrant (Required for Vector Store)
+
+```bash
+# Using Docker (recommended)
+docker run -p 6333:6333 qdrant/qdrant
+
+# Or install locally: https://qdrant.tech/documentation/guides/installation/
+```
+
+### 4. Run Tests
 
 ```bash
 # Test individual components
 python tests/test_chunker.py
 python tests/test_contextualizer.py
 python tests/test_embedder.py
+python tests/test_vector_store.py
 ```
 
 ## 💡 Usage Example
@@ -193,6 +216,7 @@ from src.document_loader import load_document
 from src.chunker import chunk_text
 from src.contextualizer import add_context_to_chunk
 from src.embedder import Embedder
+from src.vector_store import QdrantStorage
 
 # 1. Load document
 text = load_document("data/mydocument.pdf")
@@ -208,11 +232,19 @@ for chunk in chunks:
 embedder = Embedder()
 enriched_chunks = embedder.embed_chunks(chunks)
 
-# Each chunk now has:
-# - chunk_text: Original text
-# - context: Contextual description
-# - embedding: Standard embedding
-# - contextual_embedding: Context + text embedding
+# 5. Store in Qdrant
+storage = QdrantStorage()
+storage.add_chunks(enriched_chunks)
+
+# 6. Search
+query = "What are the financial results?"
+query_embedding = embedder.embed_query(query)
+results = storage.search(query_embedding, top_k=5, use_contextual=True)
+
+for result in results:
+    print(f"Score: {result['score']:.4f}")
+    print(f"Text: {result['chunk_text']}")
+    print(f"Context: {result['context']}\n")
 ```
 
 ## 📈 Performance Improvements
@@ -263,12 +295,16 @@ Based on Anthropic's research:
   - Standard embedding (baseline)
   - Contextual embedding (with added context)
 
-### ⏳ TODO (Phase 2)
+#### 5. Vector Store (`src/vector_store.py`) ⭐
+- **Qdrant vector database integration**
+- Dual named vectors storage:
+  - `embedding`: Standard chunk embedding (baseline)
+  - `contextual_embedding`: Context + chunk embedding (enhanced)
+- Collection auto-creation with proper vector configuration
+- Similarity search using `query_points()` API
+- Supports both contextual and standard vector search
 
-#### 5. Vector Store (`src/vector_store.py`)
-- Qdrant integration
-- Store and index embeddings
-- Vector similarity search
+### ⏳ TODO (Phase 2)
 
 #### 6. BM25 Index (`src/bm25_index.py`)
 - Lexical search index
@@ -309,5 +345,5 @@ MIT License - Feel free to use for learning and development
 
 ---
 
-**Status**: Phase 1 Complete (4/9 modules) ✅  
-**Next Up**: Qdrant Vector Store Integration
+**Status**: Phase 1 Complete (5/9 modules) ✅
+**Next Up**: BM25 Lexical Search Implementation
