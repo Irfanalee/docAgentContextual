@@ -93,4 +93,5 @@ class QdrantStorage:
                 "score": hit.score  
             }
             for hit in results
+            if hit.payload is not None
         ]

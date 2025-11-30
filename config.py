@@ -20,7 +20,7 @@ if not API_KEY:
 # Qdrant configuration
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 # QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", None) 
-COLLECTION_NAME ="contexstual_retrieval"
+COLLECTION_NAME ="contextual_retrieval"
 
 # Chunking config
 chunk_size = 800  # token per chunk
