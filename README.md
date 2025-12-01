@@ -63,10 +63,16 @@ Traditional RAG systems chunk documents and embed them directly. This loses cont
 │         • Standard embedding (chunk only)                        │
 │         • Contextual embedding (context + chunk)                │
 │                                                                  │
-│  5. Vector Store (Qdrant) ⭐ NEW!                                │
+│  5. Vector Store (Qdrant) ⭐                                      │
 │     └─> Store chunks with dual named vectors                    │
 │     └─> Similarity search on contextual embeddings              │
 │     └─> Collection management with auto-creation                │
+│                                                                  │
+│  6. BM25 Index ⭐ NEW!                                            │
+│     └─> Lexical search using rank-bm25 library                  │
+│     └─> Keyword-based retrieval (complements vector search)     │
+│     └─> In-memory index for fast lookup                         │
+│     └─> Combines context + chunk_text for richer matching       │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 
@@ -74,7 +80,6 @@ Traditional RAG systems chunk documents and embed them directly. This loses cont
 │                    TODO (Phase 2)                                │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  6. BM25 Index (Lexical Search)                                  │
 │  7. Hybrid Retrieval (Vector + BM25)                             │
 │  8. Reranking                                                    │
 │  9. End-to-End Pipeline                                          │
@@ -94,34 +99,57 @@ INPUT: document.pdf
              │ Full text
              ▼
     ┌────────────────┐
-    │    Chunker     │
+    │ Module 1       │
+    │ Chunker        │  → Creates: chunk_text, chunk_id
     └────────┬───────┘
              │ List of chunks
              │ [{chunk_text, chunk_id, ...}, ...]
              ▼
     ┌────────────────┐
+    │ Module 2       │
     │ Contextualizer │◄─── Claude API (Haiku)
-    └────────┬───────┘
+    └────────┬───────┘  → Adds: context
              │ Chunks with context
-             │ [{chunk_text, context, ...}, ...]
-             ▼
-    ┌────────────────┐
-    │    Embedder    │◄─── Sentence Transformer
-    └────────┬───────┘
-             │ Enriched chunks
-             │ [{chunk_text, context,
-             │   embedding, contextual_embedding}, ...]
-             ▼
-    ┌────────────────┐
-    │  Vector Store  │◄─── Qdrant Database
-    └────────┬───────┘
-             │ Stored with dual vectors:
-             │ • embedding (standard)
-             │ • contextual_embedding (enhanced)
-             ▼
+             │ [{chunk_text, context, chunk_id}, ...]
+             │
+        ┌────┴────┐
+        ▼         ▼
+    ┌────────┐ ┌────────┐
+    │Module 3│ │Module 6│
+    │Embedder│ │BM25    │
+    └────┬───┘ └────┬───┘
+         │         │
+         │ Combines: context + chunk_text
+         │         │
+         ▼         ▼
+    ┌────────┐ ┌────────┐
+    │Module 5│ │In-Mem  │
+    │Qdrant  │ │Index   │
+    └────┬───┘ └────┬───┘
+         │         │
+         │ Vector  │ Keyword
+         │ Search  │ Search
+         │         │
+         └────┬────┘
+              ▼
          OUTPUT
-         Ready for search!
+         Ready for hybrid search!
 ```
+
+### Module Connection Summary
+
+**Module 1 (Chunker)** → Creates: `chunk_text`, `chunk_id`
+
+**Module 2 (Contextualizer)** → Adds: `context`
+
+**Both Module 3 (Embedder) AND Module 6 (BM25) use:**
+- `context` (from Module 2)
+- `chunk_text` (from Module 1)
+- Combined together for richer search!
+
+**Module 3 Path:** `context + chunk_text` → Embeddings → Module 5 (Qdrant) → Vector Search
+
+**Module 6 Path:** `context + chunk_text` → Tokenization → BM25 Index → Keyword Search
 
 ## 📁 Project Structure
 
@@ -139,7 +167,7 @@ docagentContextual/
 │   ├── contextualizer.py     # ✅ Claude API integration
 │   ├── embedder.py           # ✅ Vector embeddings
 │   ├── vector_store.py       # ✅ Qdrant integration
-│   ├── bm25_index.py         # ⏳ TODO: Lexical search
+│   ├── bm25_index.py         # ✅ Lexical search
 │   ├── retriever.py          # ⏳ TODO: Hybrid retrieval
 │   └── reranker.py           # ⏳ TODO: Result reranking
 │
@@ -304,12 +332,16 @@ Based on Anthropic's research:
 - Similarity search using `query_points()` API
 - Supports both contextual and standard vector search
 
-### ⏳ TODO (Phase 2)
+#### 6. BM25 Index (`src/bm25_index.py`) ⭐
+- **Lexical keyword-based search**
+- Uses rank-bm25 library (BM25Okapi algorithm)
+- In-memory index for fast lookup
+- Combines context + chunk_text for richer matching
+- Complements vector search for hybrid retrieval
+- Tokenizes and indexes all document chunks
+- Returns scored results sorted by relevance
 
-#### 6. BM25 Index (`src/bm25_index.py`)
-- Lexical search index
-- Keyword-based retrieval
-- Complement to vector search
+### ⏳ TODO (Phase 2)
 
 #### 7. Hybrid Retriever (`src/retriever.py`)
 - Combine vector + BM25 results
@@ -345,5 +377,5 @@ MIT License - Feel free to use for learning and development
 
 ---
 
-**Status**: Phase 1 Complete (5/9 modules) ✅
-**Next Up**: BM25 Lexical Search Implementation
+**Status**: Phase 1 Complete (6/9 modules) ✅
+**Next Up**: Hybrid Retrieval (Combining Vector + BM25 Search)

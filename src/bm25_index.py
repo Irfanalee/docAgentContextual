@@ -20,7 +20,7 @@ class BM25Index:
         """
         return text.lower().split()
     
-    def add_docments(self, chunks: List[Dict]) -> None:
+    def add_documents(self, chunks: List[Dict]) -> None:
         """
         Add document chunks to the BM25 index.
         
@@ -32,6 +32,43 @@ class BM25Index:
         # Tokenize corpus - combine context and chunk_text for better matching
         self.tokenized_corpus = []
         for chunk in chunks:
+            # Combine context and chunk_text (similar to contextual embedding!)
+            combined_text = f"{chunk.get('context','')} {chunk['chunk_text']}"
+            tokens = self._tokenize(combined_text)
+            self.tokenized_corpus.append(tokens)
+        # Create BM25 index
+        self.bm25 = BM25Okapi(self.tokenized_corpus)
 
-        
-        
+    def search(self, query: str, top_k: int = 5) -> List[Dict]:
+        """
+        Search the BM25 index for the most relevant document chunks.
+            
+        Args:
+            query: The search query string
+            top_k: Number of top results to return
+            
+        Returns:
+            List of top_k most relevant document chunks
+            """
+        if self.bm25 is None:
+            raise ValueError("BM25 index is not initialized. Add documents first.")
+            
+        # Tokenize the query
+        tokenized_query = self._tokenize(query)
+
+        # Get BM25 scores
+        scores = self.bm25.get_scores(tokenized_query)
+            
+        # Get top_k indices sorted descending by score
+        top_indices = np.argsort(scores)[::-1][:top_k]
+            
+        results = []
+        for idx in top_indices:
+            if scores[idx] > 0: # Only return results with positive scores
+                results.append({
+                    'chunk_id': self.documents[idx]['chunk_id'],
+                    'chunk_text': self.documents[idx]['chunk_text'],
+                    'context': self.documents[idx].get('context',''),
+                    'score': float(scores[idx])
+                })
+        return results
