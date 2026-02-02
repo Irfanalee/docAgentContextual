@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from src.document_loader import load_document
 from src.chunker import chunk_text
 from src.contextualizer import add_context_to_chunk
+from src.contextualizer_parallel import add_context_to_chunks_batch
 from src.embedder import Embedder
 from src.vector_store import QdrantStorage
 from src.bm25_index import BM25Index
@@ -57,11 +58,10 @@ def load_and_process_document(pdf_path: str, use_mock_context: bool = False):
         for i, chunk in enumerate(chunks):
             chunk['context'] = f"This is chunk {i+1} from the document discussing various topics."
     else:
-        print("   Using Claude API for real context (this may take a while)...")
-        for i, chunk in enumerate(chunks, 1):
-            print(f"   Processing chunk {i}/{len(chunks)}...", end='\r')
-            add_context_to_chunk(chunk, document_text)
-        print(f"\n✅ Added context to all {len(chunks)} chunks")
+        print("   Using Claude API with PARALLEL processing + prompt caching...")
+        print("   This is much faster and cheaper than sequential processing!")
+        chunks = add_context_to_chunks_batch(chunks, document_text)
+        print(f"✅ Added context to all {len(chunks)} chunks")
 
     # Step 3: Generate embeddings
     print(f"\n🎯 Generating embeddings...")
